@@ -70,15 +70,21 @@ class MenuManagementPageUI extends StatefulWidget {
 class _MenuManagementPageUIState extends State<MenuManagementPageUI> {
   final Set<int> expandedMenuIds = {}; // Track expanded rows
 
-  void _toggleMenuExpansion(int id) {
-    setState(() {
-      if (expandedMenuIds.contains(id)) {
-        expandedMenuIds.remove(id);
-      } else {
-        expandedMenuIds.add(id);
-      }
-    });
-  }
+void _toggleMenuExpansion(int id) async {
+  setState(() {
+    if (expandedMenuIds.contains(id)) {
+      expandedMenuIds.remove(id);
+    } else {
+      expandedMenuIds.add(id);
+    }
+  });
+
+  // Fetch ingredients dynamically when expanding
+  if (!expandedMenuIds.contains(id)) return; // only fetch when expanding
+  await widget.onViewIngredients(id); // fetch and update selectedMenuIngredients
+}
+
+
 
   void _showAccessDeniedDialog(BuildContext context, String pageName) {
     showDialog(
@@ -97,6 +103,8 @@ class _MenuManagementPageUIState extends State<MenuManagementPageUI> {
       ),
     );
   }
+
+  
 
 List<DataRow> buildRows() {
   final filteredMenuItems = widget.menuItems.where((item) {
@@ -132,12 +140,16 @@ List<DataRow> buildRows() {
             Row(
               children: [
                 Expanded(child: Text(item['name'] ?? 'Unnamed')),
-                Icon(
-                  expandedMenuIds.contains(id)
-                      ? Icons.arrow_drop_up
-                      : Icons.arrow_drop_down,
-                  color: Colors.grey,
-                ),
+                IconButton(
+  icon: Icon(
+    expandedMenuIds.contains(id)
+        ? Icons.arrow_drop_up
+        : Icons.arrow_drop_down,
+  ),
+  onPressed: () {
+    _toggleMenuExpansion(id); // <-- only toggles dropdown
+  },
+),
               ],
             ),
             onTap: () {
@@ -194,19 +206,20 @@ List<DataRow> buildRows() {
 
               // Add Ingredient - only triggers popup
               Container(
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.playlist_add, color: Colors.orange, size: 24),
-                  tooltip: "Add Ingredient",
-                  onPressed: () {
-                    widget.onViewIngredients(id);
-                    // Removed duplicate _showIngredientsPopup call
-                  },
-                ),
-              ),
+  decoration: BoxDecoration(
+    color: Colors.orange.withOpacity(0.15),
+    borderRadius: BorderRadius.circular(8),
+  ),
+  child: IconButton(
+  icon: const Icon(Icons.playlist_add, color: Colors.orange),
+  tooltip: "Add Ingredient",
+  onPressed: () {
+    widget.onAddIngredient(id); // ✅ opens popup
+  },
+),
+
+),
+
             ],
           )),
         ],
@@ -214,39 +227,41 @@ List<DataRow> buildRows() {
     );
 
     // Inline ingredient rows for expanded menu
-    if (expandedMenuIds.contains(id)) {
-      final ingredients = (item['ingredients'] as List<dynamic>? ?? [])
+if (expandedMenuIds.contains(id)) {
+  final ingredients = widget.selectedMenuId == id
+      ? widget.selectedMenuIngredients
+      : (item['ingredients'] as List<dynamic>? ?? [])
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
 
-      rows.addAll(
-        ingredients.map(
-          (ingredient) => DataRow(
-            color: MaterialStateProperty.all(Colors.orange[50]),
-            cells: [
-              const DataCell(SizedBox()), // empty image
-              DataCell(Text(ingredient['name'] ?? "")),
-              DataCell(Text(ingredient['quantity']?.toString() ?? "")),
-              DataCell(Text(ingredient['unit']?.toString() ?? "")),
-              DataCell(Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () {
-                      widget.onDeleteIngredient(
-                        id,
-                        int.parse(ingredient['id'].toString()),
-                      );
-                    },
-                  ),
-                ],
-              )),
-              const DataCell(SizedBox()), // empty cell for actions
+  rows.addAll(
+    ingredients.map(
+      (ingredient) => DataRow(
+        color: MaterialStateProperty.all(Colors.orange[50]),
+        cells: [
+          const DataCell(SizedBox()), // empty image
+          DataCell(Text(ingredient['name'] ?? "")),
+          DataCell(Text(ingredient['quantity']?.toString() ?? "")),
+          DataCell(Text(ingredient['unit']?.toString() ?? "")),
+          DataCell(Row(
+            children: [
+              IconButton(
+  icon: const Icon(Icons.playlist_add),
+  onPressed: () async {
+    await widget.onAddIngredient(id); // opens add dialog
+    await widget.onViewIngredients(id); // refresh dropdown
+  },
+),
             ],
-          ),
-        ),
-      );
-    }
+          )),
+          const DataCell(SizedBox()), // empty cell for actions
+        ],
+      ),
+    ),
+  );
+}
+
+
   }
 
   return rows;

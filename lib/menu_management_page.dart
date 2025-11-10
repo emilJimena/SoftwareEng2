@@ -134,8 +134,9 @@ class _MenuManagementPageState extends State<MenuManagementPage> {
       }
     }
   }
-
-  Future<void> onViewIngredientsAndShow(int menuId) async {
+  
+// ✅ Existing popup version — no change needed
+Future<void> onViewIngredientsAndShow(int menuId) async {
   try {
     final response = await http.get(
       Uri.parse("$apiBase/menu/get_menu_ingredients.php?menu_id=$menuId"),
@@ -143,7 +144,7 @@ class _MenuManagementPageState extends State<MenuManagementPage> {
     final data = jsonDecode(response.body);
     if (data['success']) {
       List<Map> ingredients = List<Map>.from(data['data']);
-      _showIngredientsPopup(menuId, ingredients);
+      _showIngredientsPopup(menuId, ingredients); // ✅ this shows popup
     } else {
       _showSnackBar(data['message']);
     }
@@ -151,6 +152,7 @@ class _MenuManagementPageState extends State<MenuManagementPage> {
     _showSnackBar("Error fetching ingredients: $e");
   }
 }
+
 
 void _showIngredientsPopup(int menuId, List<Map> ingredients) {
   showDialog(
@@ -241,6 +243,31 @@ void _showIngredientsPopup(int menuId, List<Map> ingredients) {
     },
   );
 }
+
+  // For inline dropdown expansion
+// ✅ 1. This is only for fetching ingredients for dropdown expansion
+// ✅ New function for dropdown expansion only (no popup)
+Future<void> onFetchIngredients(int menuId) async {
+  try {
+    final response = await http.get(
+      Uri.parse("$apiBase/menu/get_menu_ingredients.php?menu_id=$menuId"),
+    );
+
+    final data = jsonDecode(response.body);
+    if (data['success']) {
+      List<Map> ingredients = List<Map>.from(data['data']);
+      setState(() {
+        selectedMenuId = menuId;
+        selectedMenuIngredients = ingredients;
+      });
+    } else {
+      _showSnackBar(data['message']);
+    }
+  } catch (e) {
+    _showSnackBar("Error fetching ingredients: $e");
+  }
+}
+
 
 
   Future<void> onDeleteIngredient(int menuId, int ingredientId) async {
@@ -395,9 +422,9 @@ void _showIngredientsPopup(int menuId, List<Map> ingredients) {
       },
       selectedMenuId: selectedMenuId,
       selectedMenuIngredients: selectedMenuIngredients,
-      onAddIngredient: onAddIngredient,
+      onViewIngredients: onFetchIngredients,      // 👈 dropdown only
+      onAddIngredient: onViewIngredientsAndShow,  // 👈 popup
       onDeleteIngredient: onDeleteIngredient,
-onViewIngredients: onViewIngredientsAndShow,
     );
   }
 }
