@@ -7,7 +7,7 @@ import '../sales_page.dart';
 import '../expenses_page.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class MenuManagementPageUI extends StatelessWidget {
+class MenuManagementPageUI extends StatefulWidget {
   final bool isSidebarOpen;
   final VoidCallback toggleSidebar;
   final List menuItems;
@@ -63,6 +63,23 @@ class MenuManagementPageUI extends StatelessWidget {
     Key? key,
   }) : super(key: key);
 
+  @override
+  _MenuManagementPageUIState createState() => _MenuManagementPageUIState();
+}
+
+class _MenuManagementPageUIState extends State<MenuManagementPageUI> {
+  final Set<int> expandedMenuIds = {}; // Track expanded rows
+
+  void _toggleMenuExpansion(int id) {
+    setState(() {
+      if (expandedMenuIds.contains(id)) {
+        expandedMenuIds.remove(id);
+      } else {
+        expandedMenuIds.add(id);
+      }
+    });
+  }
+
   void _showAccessDeniedDialog(BuildContext context, String pageName) {
     showDialog(
       context: context,
@@ -81,110 +98,163 @@ class MenuManagementPageUI extends StatelessWidget {
     );
   }
 
-void _showIngredientsPopup(BuildContext context, List<Map> ingredients) {
-  if (ingredients.isEmpty) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text(
-          "Ingredients for Selected Menu",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+List<DataRow> buildRows() {
+  final filteredMenuItems = widget.menuItems.where((item) {
+    final status = item['status']?.toString().toLowerCase() ?? 'visible';
+    return widget.showHidden ? status == 'hidden' : status == 'visible';
+  }).toList();
+
+  List<DataRow> rows = [];
+
+  for (var item in filteredMenuItems) {
+    final id = int.parse(item['id'].toString());
+
+    // Main menu row
+    rows.add(
+      DataRow(
+        color: MaterialStateProperty.resolveWith<Color?>(
+          (states) => filteredMenuItems.indexOf(item).isEven
+              ? Colors.grey[50]
+              : Colors.white,
         ),
-        content: const Text(
-          "No ingredients added yet.",
-          style: TextStyle(color: Colors.black87),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              "Close",
-              style: TextStyle(color: Colors.black87),
-            ),
+        cells: [
+          DataCell(
+            item['image'] != null && item['image'].toString().isNotEmpty
+                ? Image.network(
+                    item['image'],
+                    width: 50,
+                    height: 50,
+                    fit: BoxFit.cover,
+                  )
+                : const Icon(Icons.image_not_supported, color: Colors.grey),
           ),
+          DataCell(
+            Row(
+              children: [
+                Expanded(child: Text(item['name'] ?? 'Unnamed')),
+                Icon(
+                  expandedMenuIds.contains(id)
+                      ? Icons.arrow_drop_up
+                      : Icons.arrow_drop_down,
+                  color: Colors.grey,
+                ),
+              ],
+            ),
+            onTap: () {
+              _toggleMenuExpansion(id); // Only toggle inline expansion
+            },
+          ),
+          DataCell(Text("₱${item['price']}")),
+          DataCell(SizedBox(
+            width: 200,
+            child: Text(
+              item['description'] ?? "No description",
+              overflow: TextOverflow.ellipsis,
+            ),
+          )),
+          DataCell(Text(item['category'] ?? "")),
+          DataCell(Row(
+            children: [
+              // Edit button
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.edit, color: Colors.blue, size: 24),
+                  tooltip: "Edit Menu",
+                  onPressed: () => widget.onEditMenu(item),
+                ),
+              ),
+              const SizedBox(width: 6),
+
+              // Visibility toggle
+              Container(
+                decoration: BoxDecoration(
+                  color: (item['status'] == "visible"
+                          ? Colors.green
+                          : Colors.red)
+                      .withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    item['status'] == "visible"
+                        ? Icons.visibility
+                        : Icons.visibility_off,
+                    color: item['status'] == "visible" ? Colors.green : Colors.red,
+                    size: 24,
+                  ),
+                  tooltip: item['status'] == "visible" ? "Hide Menu" : "Show Menu",
+                  onPressed: () => widget.onToggleMenu(id, item['status']),
+                ),
+              ),
+              const SizedBox(width: 6),
+
+              // Add Ingredient - only triggers popup
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.playlist_add, color: Colors.orange, size: 24),
+                  tooltip: "Add Ingredient",
+                  onPressed: () {
+                    widget.onViewIngredients(id);
+                    // Removed duplicate _showIngredientsPopup call
+                  },
+                ),
+              ),
+            ],
+          )),
         ],
       ),
     );
-    return;
-  }
 
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: const Text(
-        "Ingredients for Selected Menu",
-        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
-      ),
-      content: SizedBox(
-        width: 600,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowColor: MaterialStateProperty.all(Colors.grey[200]),
-            headingTextStyle: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-            dataTextStyle: const TextStyle(color: Colors.black87),
-            columns: const [
-              DataColumn(label: Text("Raw Material")),
-              DataColumn(label: Text("Quantity")),
-              DataColumn(label: Text("Unit")),
-              DataColumn(label: Text("Actions")),
-            ],
-            rows: ingredients.map((ingredient) {
-              return DataRow(
-                color: MaterialStateProperty.resolveWith<Color?>(
-                  (states) => ingredients.indexOf(ingredient).isEven
-                      ? Colors.white
-                      : Colors.grey[50],
-                ),
-                cells: [
-                  DataCell(Text(ingredient['name'] ?? "")),
-                  DataCell(Text(ingredient['quantity']?.toString() ?? "")),
-                  DataCell(Text(ingredient['unit']?.toString() ?? "")),
-                  DataCell(
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () {
-                        if (selectedMenuId != null) {
-                          onDeleteIngredient(
-                            selectedMenuId!,
-                            int.parse(ingredient['id'].toString()),
-                          );
-                        }
-                      },
-                    ),
+    // Inline ingredient rows for expanded menu
+    if (expandedMenuIds.contains(id)) {
+      final ingredients = (item['ingredients'] as List<dynamic>? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+
+      rows.addAll(
+        ingredients.map(
+          (ingredient) => DataRow(
+            color: MaterialStateProperty.all(Colors.orange[50]),
+            cells: [
+              const DataCell(SizedBox()), // empty image
+              DataCell(Text(ingredient['name'] ?? "")),
+              DataCell(Text(ingredient['quantity']?.toString() ?? "")),
+              DataCell(Text(ingredient['unit']?.toString() ?? "")),
+              DataCell(Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () {
+                      widget.onDeleteIngredient(
+                        id,
+                        int.parse(ingredient['id'].toString()),
+                      );
+                    },
                   ),
                 ],
-              );
-            }).toList(),
+              )),
+              const DataCell(SizedBox()), // empty cell for actions
+            ],
           ),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text(
-            "Close",
-            style: TextStyle(color: Colors.black87),
-          ),
-        ),
-      ],
-    ),
-  );
+      );
+    }
+  }
+
+  return rows;
 }
+
 
   @override
   Widget build(BuildContext context) {
-    final filteredMenuItems = menuItems.where((item) {
-      final status = item['status']?.toString().toLowerCase() ?? 'visible';
-      return showHidden ? status == 'hidden' : status == 'visible';
-    }).toList();
 
     return Scaffold(
       body: Stack(
@@ -206,36 +276,36 @@ void _showIngredientsPopup(BuildContext context, List<Map> ingredients) {
           Row(
             children: [
               Sidebar(
-                isSidebarOpen: isSidebarOpen,
-                onHome: onHome,
-                onDashboard: onDashboard,
-                onTaskPage: onTaskPage,
+                isSidebarOpen: widget.isSidebarOpen,
+                onHome: widget.onHome,
+                onDashboard: widget.onDashboard,
+                onTaskPage: widget.onTaskPage,
                 onMaterials: () {
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
                       builder: (_) => ManagerPage(
-                        username: username,
-                        role: role,
-                        userId: userId,
+                        username: widget.username,
+                        role: widget.role,
+                        userId: widget.userId,
                       ),
                     ),
                   );
                 },
                 onInventory: () {
-                  if (role.toLowerCase() == "manager") {
+                  if (widget.role.toLowerCase() == "manager") {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => InventoryManagementPage(
-                          userId: userId,
-                          username: username,
-                          role: role,
-                          isSidebarOpen: isSidebarOpen,
-                          toggleSidebar: toggleSidebar,
-                          onHome: onHome,
-                          onDashboard: onDashboard,
-                          onLogout: onLogout,
+                          userId: widget.userId,
+                          username: widget.username,
+                          role: widget.role,
+                          isSidebarOpen: widget.isSidebarOpen,
+                          toggleSidebar: widget.toggleSidebar,
+                          onHome: widget.onHome,
+                          onDashboard: widget.onDashboard,
+                          onLogout: widget.onLogout,
                         ),
                       ),
                     );
@@ -248,27 +318,27 @@ void _showIngredientsPopup(BuildContext context, List<Map> ingredients) {
                     context,
                     MaterialPageRoute(
                       builder: (_) => MenuManagementPage(
-                        username: username,
-                        role: role,
-                        userId: userId,
+                        username: widget.username,
+                        role: widget.role,
+                        userId: widget.userId,
                       ),
                     ),
                   );
                 },
                 onSales: () {
-                  if (role.toLowerCase() == "manager") {
+                  if (widget.role.toLowerCase() == "manager") {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => SalesContent(
-                          userId: userId,
-                          username: username,
-                          role: role,
-                          isSidebarOpen: isSidebarOpen,
-                          toggleSidebar: toggleSidebar,
-                          onHome: () => onHome,
-                          onDashboard: () => onDashboard,
-                          onLogout: onLogout,
+                          userId: widget.userId,
+                          username: widget.username,
+                          role: widget.role,
+                          isSidebarOpen: widget.isSidebarOpen,
+                          toggleSidebar: widget.toggleSidebar,
+                          onHome: () => widget.onHome,
+                          onDashboard: () => widget.onDashboard,
+                          onLogout: widget.onLogout,
                         ),
                       ),
                     );
@@ -277,19 +347,19 @@ void _showIngredientsPopup(BuildContext context, List<Map> ingredients) {
                   }
                 },
                 onExpenses: () {
-                  if (role.toLowerCase() == "manager") {
+                  if (widget.role.toLowerCase() == "manager") {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => ExpensesContent(
-                          userId: userId,
-                          username: username,
-                          role: role,
-                          isSidebarOpen: isSidebarOpen,
-                          toggleSidebar: toggleSidebar,
-                          onHome: () => onHome,
-                          onDashboard: () => onDashboard,
-                          onLogout: onLogout,
+                          userId: widget.userId,
+                          username: widget.username,
+                          role: widget.role,
+                          isSidebarOpen: widget.isSidebarOpen,
+                          toggleSidebar: widget.toggleSidebar,
+                          onHome: () => widget.onHome,
+                          onDashboard: () => widget.onDashboard,
+                          onLogout: widget.onLogout,
                         ),
                       ),
                     );
@@ -297,10 +367,10 @@ void _showIngredientsPopup(BuildContext context, List<Map> ingredients) {
                     _showAccessDeniedDialog(context, "Expenses");
                   }
                 },
-                username: username,
-                role: role,
-                userId: userId,
-                onLogout: onLogout,
+                username: widget.username,
+                role: widget.role,
+                userId: widget.userId,
+                onLogout: widget.onLogout,
                 activePage: "menu",
               ),
 
@@ -329,12 +399,12 @@ void _showIngredientsPopup(BuildContext context, List<Map> ingredients) {
                           children: [
                             IconButton(
                               icon: Icon(
-                                isSidebarOpen
+                                widget.isSidebarOpen
                                     ? Icons.arrow_back_ios
                                     : Icons.menu,
                                 color: Colors.orange,
                               ),
-                              onPressed: toggleSidebar,
+                              onPressed: widget.toggleSidebar,
                             ),
                             const SizedBox(width: 10),
                             Text(
@@ -347,15 +417,15 @@ void _showIngredientsPopup(BuildContext context, List<Map> ingredients) {
                             ),
                             const Spacer(),
                             ElevatedButton.icon(
-                              onPressed: onShowHiddenToggle,
+                              onPressed: widget.onShowHiddenToggle,
                               icon: Icon(
-                                showHidden
+                                widget.showHidden
                                     ? Icons.visibility
                                     : Icons.visibility_off,
                                 color: Colors.white,
                               ),
                               label: Text(
-                                showHidden
+                                widget.showHidden
                                     ? "Visible Menu"
                                     : "Hidden Menu",
                                 style: GoogleFonts.poppins(
@@ -365,7 +435,7 @@ void _showIngredientsPopup(BuildContext context, List<Map> ingredients) {
                                 ),
                               ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: showHidden
+                                backgroundColor: widget.showHidden
                                     ? Colors.green
                                     : Colors.redAccent,
                                 padding: const EdgeInsets.symmetric(
@@ -377,7 +447,7 @@ void _showIngredientsPopup(BuildContext context, List<Map> ingredients) {
                             ),
                             const SizedBox(width: 12),
                             ElevatedButton.icon(
-                              onPressed: onAddEntry,
+                              onPressed: widget.onAddEntry,
                               icon: const Icon(Icons.add, color: Colors.white),
                               label: Text(
                                 "Add Menu",
@@ -403,7 +473,7 @@ void _showIngredientsPopup(BuildContext context, List<Map> ingredients) {
 
                     // === MAIN CONTENT ===
                     Expanded(
-                      child: isLoading
+                      child: widget.isLoading
                           ? const Center(child: CircularProgressIndicator())
                           : SingleChildScrollView(
                               child: Column(
@@ -417,7 +487,8 @@ void _showIngredientsPopup(BuildContext context, List<Map> ingredients) {
                                                   .width *
                                               0.95,
                                         ),
-                                        margin: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
+                                        margin: const EdgeInsets.symmetric(
+                                            horizontal: 50, vertical: 20),
                                         padding: const EdgeInsets.all(16),
                                         decoration: BoxDecoration(
                                           color: Colors.white,
@@ -432,168 +503,57 @@ void _showIngredientsPopup(BuildContext context, List<Map> ingredients) {
                                           ],
                                         ),
                                         child: LayoutBuilder(
-  builder: (context, constraints) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: ConstrainedBox(
-        // expands the table to fill available width, but scrolls if smaller
-        constraints: BoxConstraints(minWidth: constraints.maxWidth),
-        child: DataTable(
-          sortColumnIndex: sortColumnIndex,
-          sortAscending: sortAscending,
-          headingRowColor:
-              MaterialStateProperty.all(Colors.orange.shade100),
-          headingTextStyle: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-          dataTextStyle: const TextStyle(
-            color: Colors.black87,
-            fontSize: 15,
-          ),
-          dividerThickness: 1,
-          horizontalMargin: 24,
-          columnSpacing: 40,
-          border: TableBorder(
-            horizontalInside: BorderSide(
-              width: 0.5,
-              color: Colors.grey.shade300,
-            ),
-          ),
-          columns: [
-            const DataColumn(label: Text("Image")),
-            DataColumn(
-              label: const Text("Product Name"),
-              onSort: (col, asc) => onSort(
-                (m) => m['name'] ?? '',
-                col,
-                asc,
-              ),
-            ),
-            DataColumn(
-              label: const Text("Price"),
-              onSort: (col, asc) => onSort(
-                (m) => double.tryParse(
-                        m['price']?.toString() ?? "0") ??
-                    0,
-                col,
-                asc,
-              ),
-            ),
-            const DataColumn(label: Text("Description")),
-            const DataColumn(label: Text("Category")),
-            const DataColumn(label: Text("Actions")),
-          ],
-          rows: filteredMenuItems.map<DataRow>((item) {
-            final id = int.parse(item['id'].toString());
-            return DataRow(
-              color: MaterialStateProperty.resolveWith<Color?>(
-                (states) => filteredMenuItems.indexOf(item).isEven
-                    ? Colors.grey[50]
-                    : Colors.white,
-              ),
-              cells: [
-                DataCell(
-                  item['image'] != null &&
-                          item['image'].toString().isNotEmpty
-                      ? Image.network(item['image'],
-                          width: 50, height: 50, fit: BoxFit.cover)
-                      : const Icon(Icons.image_not_supported,
-                          color: Colors.grey),
-                ),
-                DataCell(
-  Text(item['name'] ?? 'Unnamed'),
-  onTap: () async {
-    // Make sure ingredients are updated first
-    await onViewIngredients(id);
-    // Then show popup with latest ingredients
-    _showIngredientsPopup(context, selectedMenuIngredients);
-  },
-),
-
-                DataCell(Text("₱${item['price']}")),
-                DataCell(SizedBox(
-                  width: 200,
-                  child: Text(
-                    item['description'] ?? "No description",
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                )),
-                DataCell(Text(item['category'] ?? "")),
-                DataCell(Row(
-                  children: [
-                    // Edit
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.edit,
-                            color: Colors.blue, size: 24),
-                        tooltip: "Edit Menu",
-                        onPressed: () => onEditMenu(item),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    // Show / Hide
-                    Container(
-                      decoration: BoxDecoration(
-                        color: (item['status'] == "visible"
-                                ? Colors.green
-                                : Colors.red)
-                            .withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: IconButton(
-                        icon: Icon(
-                          item['status'] == "visible"
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                          color: item['status'] == "visible"
-                              ? Colors.green
-                              : Colors.red,
-                          size: 24,
-                        ),
-                        tooltip: item['status'] == "visible"
-                            ? "Hide Menu"
-                            : "Show Menu",
-                        onPressed: () => onToggleMenu(
-                          int.parse(item['id'].toString()),
-                          item['status'],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    // Add Ingredient
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.playlist_add,
-                            color: Colors.orange, size: 24),
-                        tooltip: "Add Ingredient",
-                        onPressed: () {
-                          onViewIngredients(id);
-                          if (selectedMenuIngredients.isNotEmpty) {
-_showIngredientsPopup(context, selectedMenuIngredients);
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                )),
-              ],
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  },
-),
-
+                                          builder: (context, constraints) {
+                                            return SingleChildScrollView(
+                                              scrollDirection: Axis.horizontal,
+                                              child: ConstrainedBox(
+                                                constraints: BoxConstraints(
+                                                    minWidth:
+                                                        constraints.maxWidth),
+                                                child: DataTable(
+                                                  sortColumnIndex:
+                                                      widget.sortColumnIndex,
+                                                  sortAscending:
+                                                      widget.sortAscending,
+                                                  headingRowColor:
+                                                      MaterialStateProperty.all(
+                                                          Colors
+                                                              .orange.shade100),
+                                                  headingTextStyle:
+                                                      const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.black87,
+                                                  ),
+                                                  dataTextStyle:
+                                                      const TextStyle(
+                                                    color: Colors.black87,
+                                                    fontSize: 15,
+                                                  ),
+                                                  dividerThickness: 1,
+                                                  horizontalMargin: 24,
+                                                  columnSpacing: 40,
+                                                  border: TableBorder(
+                                                    horizontalInside:
+                                                        BorderSide(
+                                                      width: 0.5,
+                                                      color: Colors.grey.shade300,
+                                                    ),
+                                                  ),
+                                                  columns: const [
+                                                    DataColumn(label: Text("Image")),
+                                                    DataColumn(
+                                                        label: Text("Product Name")),
+                                                    DataColumn(label: Text("Price")),
+                                                    DataColumn(label: Text("Description")),
+                                                    DataColumn(label: Text("Category")),
+                                                    DataColumn(label: Text("Actions")),
+                                                  ],
+                                                  rows: buildRows(),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
                                       ),
                                     ],
                                   ),
