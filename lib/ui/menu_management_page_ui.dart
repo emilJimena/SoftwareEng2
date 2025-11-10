@@ -81,91 +81,103 @@ class MenuManagementPageUI extends StatelessWidget {
     );
   }
 
-  /// ✅ POPUP DIALOG for showing ingredients
-  void _showIngredientsPopup(BuildContext context) {
-    if (selectedMenuId == null) return;
-
+void _showIngredientsPopup(BuildContext context, List<Map> ingredients) {
+  if (ingredients.isEmpty) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color.fromARGB(255, 37, 37, 37),
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: const Text(
           "Ingredients for Selected Menu",
-          style: TextStyle(color: Colors.orangeAccent),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
         ),
-        content: SizedBox(
-          width: 600,
-          child: selectedMenuIngredients.isEmpty
-              ? const Text(
-                  "No ingredients added yet.",
-                  style: TextStyle(color: Colors.white70),
-                )
-              : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    columnSpacing: 30,
-                    headingRowHeight: 50,
-                    dataRowHeight: 50,
-                    columns: const [
-                      DataColumn(
-                        label: Text("Raw Material",
-                            style: TextStyle(color: Colors.white)),
-                      ),
-                      DataColumn(
-                        label: Text("Quantity",
-                            style: TextStyle(color: Colors.white)),
-                      ),
-                      DataColumn(
-                        label:
-                            Text("Unit", style: TextStyle(color: Colors.white)),
-                      ),
-                      DataColumn(
-                        label: Text("Actions",
-                            style: TextStyle(color: Colors.white)),
-                      ),
-                    ],
-                    rows: selectedMenuIngredients.map((ingredient) {
-                      return DataRow(cells: [
-                        DataCell(Text(
-                          ingredient['name'] ?? "",
-                          style: const TextStyle(color: Colors.white70),
-                        )),
-                        DataCell(Text(
-                          ingredient['quantity']?.toString() ?? "",
-                          style: const TextStyle(color: Colors.white70),
-                        )),
-                        DataCell(Text(
-                          ingredient['unit']?.toString() ?? "",
-                          style: const TextStyle(color: Colors.white70),
-                        )),
-                        DataCell(
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () {
-                              if (selectedMenuId != null) {
-                                onDeleteIngredient(
-                                  selectedMenuId!,
-                                  int.parse(ingredient['id'].toString()),
-                                );
-                              }
-                            },
-                          ),
-                        ),
-                      ]);
-                    }).toList(),
-                  ),
-                ),
+        content: const Text(
+          "No ingredients added yet.",
+          style: TextStyle(color: Colors.black87),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Close", style: TextStyle(color: Colors.orange)),
+            child: const Text(
+              "Close",
+              style: TextStyle(color: Colors.black87),
+            ),
           ),
         ],
       ),
     );
+    return;
   }
+
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      title: const Text(
+        "Ingredients for Selected Menu",
+        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+      ),
+      content: SizedBox(
+        width: 600,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            headingRowColor: MaterialStateProperty.all(Colors.grey[200]),
+            headingTextStyle: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+            dataTextStyle: const TextStyle(color: Colors.black87),
+            columns: const [
+              DataColumn(label: Text("Raw Material")),
+              DataColumn(label: Text("Quantity")),
+              DataColumn(label: Text("Unit")),
+              DataColumn(label: Text("Actions")),
+            ],
+            rows: ingredients.map((ingredient) {
+              return DataRow(
+                color: MaterialStateProperty.resolveWith<Color?>(
+                  (states) => ingredients.indexOf(ingredient).isEven
+                      ? Colors.white
+                      : Colors.grey[50],
+                ),
+                cells: [
+                  DataCell(Text(ingredient['name'] ?? "")),
+                  DataCell(Text(ingredient['quantity']?.toString() ?? "")),
+                  DataCell(Text(ingredient['unit']?.toString() ?? "")),
+                  DataCell(
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () {
+                        if (selectedMenuId != null) {
+                          onDeleteIngredient(
+                            selectedMenuId!,
+                            int.parse(ingredient['id'].toString()),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text(
+            "Close",
+            style: TextStyle(color: Colors.black87),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -490,12 +502,15 @@ class MenuManagementPageUI extends StatelessWidget {
                           color: Colors.grey),
                 ),
                 DataCell(
-                  Text(item['name'] ?? 'Unnamed'),
-                  onTap: () {
-                    onViewIngredients(id);
-                    _showIngredientsPopup(context);
-                  },
-                ),
+  Text(item['name'] ?? 'Unnamed'),
+  onTap: () async {
+    // Make sure ingredients are updated first
+    await onViewIngredients(id);
+    // Then show popup with latest ingredients
+    _showIngredientsPopup(context, selectedMenuIngredients);
+  },
+),
+
                 DataCell(Text("₱${item['price']}")),
                 DataCell(SizedBox(
                   width: 200,
@@ -563,7 +578,7 @@ class MenuManagementPageUI extends StatelessWidget {
                         onPressed: () {
                           onViewIngredients(id);
                           if (selectedMenuIngredients.isNotEmpty) {
-                            _showIngredientsPopup(context);
+_showIngredientsPopup(context, selectedMenuIngredients);
                           }
                         },
                       ),
